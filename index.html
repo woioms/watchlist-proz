@@ -432,15 +432,15 @@
         // Initial Data Seed
         const INITIAL_DATA = [
             // TV Series
-            ...['Reacher', 'Breaking Bad', 'Prison Break', 'Chernobyl', 'Game of thrones', 'Stranger Things', 'Dark', 'Black Mirror', 'Mr Robot']
+            ...[]
             .map((t, i) => ({ id: generateUUID(), title: t, category: 'tv_series', status: 'plan_to_watch', priority: i, currentSeason: '', totalSeasons: '', episodesWatched: '', episodesTotal: '', rating: 0, watchUrl: '' })),
             
             // Movies
-            ...['2.0', 'PK', 'Vettaiyan', 'Toxic - not yet released']
+            ...[]
             .map((t, i) => ({ id: generateUUID(), title: t, category: 'movies', status: 'plan_to_watch', priority: i, currentSeason: '', totalSeasons: '', episodesWatched: '', episodesTotal: '', rating: 0, watchUrl: '' })),
 
             // Sinhala Dramas
-            ...['Paara dige', 'Ahankara adare', 'Mal Bigun', 'Koombiyo', 'Alawanthi', 'Raaga - ITN', 'Aluth sir', 'Husmak Lagin', 'Naadagamkarayo', 'Bolt Anayak', 'LBW - ITN', 'Thaappen Panna', 'Hithaagannama Bari Kathawak', 'Delft - Derana', 'Natath Ayek Sura Mathin', 'Patti Gedara', 'Jahuta', 'Sihineka Thaniwela', 'Rocky - Sirasa', 'Bodin Gedara - Derana', 'Kolamba Kattiya', 'Neela Samanalee', 'Sith Athara Histhan - Swarnawahini', 'Knock Out - Jathika Rupawahini', 'Amuthu Kalliya', 'Meesha', 'Siri - Hiru', 'Ron Soya']
+            ...[]
             .map((t, i) => ({ 
                 id: generateUUID(), 
                 title: t, 
@@ -453,7 +453,7 @@
             })),
 
             // Sinhala Films
-            ...['Garasara', 'Sri Siddha', 'Gharasarapa']
+            ...[]
             .map((t, i) => ({ id: generateUUID(), title: t, category: 'sinhala_films', status: 'plan_to_watch', priority: i, currentSeason: '', totalSeasons: '', episodesWatched: '', episodesTotal: '', rating: 0, watchUrl: '' }))
         ];
 
