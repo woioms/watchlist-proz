@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Watchlist Pro</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons (Phosphor Icons) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                    },
+                    colors: {
+                        apple: {
+                            blue: '#007AFF',
+                            blueHover: '#0062CC',
+                            bg: '#F2F2F7',
+                            card: 'rgba(255, 255, 255, 0.75)',
+                            text: '#1C1C1E',
+                            subtext: '#8E8E93',
+                            border: 'rgba(229, 229, 234, 0.8)',
+                            glass: 'rgba(255, 255, 255, 0.65)',
+                            glassDark: 'rgba(242, 242, 247, 0.85)'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Dexie.js for IndexedDB -->
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
+    <!-- SortableJS for Drag and Drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
+    <style>
+        body {
+            background-color: #EFEFF4;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(0, 122, 255, 0.05) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(52, 199, 89, 0.05) 0px, transparent 50%);
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: none;
+        }
+        
+        /* Apple Liquid Glass Styling */
+        .liquid-glass {
+            background: rgba(255, 255, 255, 0.72);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.04);
+        }
+
+        .liquid-glass-card {
+            background: rgba(255, 255, 255, 0.82);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+        }
+
+        .liquid-pill {
+            background: rgba(230, 230, 238, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .liquid-pill-active {
+            background: #FFFFFF;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.9);
+        }
+
+        /* Hide scrollbars */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Dragging styles */
+        .sortable-ghost {
+            opacity: 0.35;
+            background-color: #E5E5EA !important;
+            border-radius: 12px;
+        }
+        .sortable-drag {
+            cursor: grabbing !important;
+            box-shadow: 0 16px 32px rgba(0,0,0,0.12) !important;
+            transform: scale(1.02);
+        }
+
+        /* Smooth custom animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.96); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .animate-pop-in {
+            animation: fadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .truncate-2-lines {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;  
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="text-apple-text font-sans h-screen flex flex-col antialiased selection:bg-blue-100">
+
+    <!-- App Header -->
+    <header class="liquid-glass sticky top-0 z-40 border-b border-apple-border/50">
+        <div class="max-w-3xl mx-auto px-4 pt-3 pb-2 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-xl bg-apple-blue flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+                    <i class="ph-bold ph-film-strip text-lg"></i>
+                </div>
+                <h1 class="text-xl font-bold tracking-tight text-gray-900">Watchlist</h1>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <button onclick="openBackupModal()" class="w-9 h-9 flex items-center justify-center rounded-full text-apple-blue hover:bg-blue-50/80 active:scale-95 transition-all" title="Settings & Backup">
+                    <i class="ph-bold ph-gear text-xl"></i>
+                </button>
+                <button onclick="openEditModal()" class="w-9 h-9 flex items-center justify-center rounded-full bg-apple-blue text-white shadow-md shadow-blue-500/25 hover:bg-apple-blueHover active:scale-95 transition-all" title="Add New Watch Item">
+                    <i class="ph-bold ph-plus text-lg"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Search & Filter Controls -->
+        <div class="max-w-3xl mx-auto px-4 pb-2 pt-1 flex gap-2">
+            <div class="relative flex-1">
+                <i class="ph-bold ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                <input type="text" id="searchInput" oninput="handleSearch(this.value)" placeholder="Search title..." class="w-full pl-9 pr-3 py-1.5 bg-gray-200/60 rounded-xl text-sm outline-none border border-transparent focus:border-apple-blue/40 focus:bg-white transition-all">
+                <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    <i class="ph-fill ph-x-circle text-sm"></i>
+                </button>
+            </div>
+            
+            <!-- Status Filter Pill -->
+            <div class="relative">
+                <select id="statusFilterSelect" onchange="handleFilterChange(this.value)" class="appearance-none bg-gray-200/60 pl-3 pr-7 py-1.5 rounded-xl text-xs font-semibold text-gray-700 outline-none cursor-pointer border border-transparent focus:border-apple-blue/40 focus:bg-white transition-all">
+                    <option value="all">All Statuses</option>
+                    <option value="plan_to_watch">Plan to Watch</option>
+                    <option value="watching">Watching</option>
+                    <option value="completed">Completed</option>
+                    <option value="dropped">Dropped</option>
+                </select>
+                <i class="ph-bold ph-caret-down absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 text-xs pointer-events-none"></i>
+            </div>
+        </div>
+        
+        <!-- Category Segmented Control -->
+        <div class="max-w-3xl mx-auto px-4 pb-3">
+            <div class="liquid-pill p-1 rounded-2xl flex overflow-x-auto no-scrollbar gap-1" id="categoryTabs">
+                <!-- Tabs generated by JS -->
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto p-4 pb-28">
+        <div class="max-w-3xl mx-auto">
+            <!-- Empty State -->
+            <div id="emptyState" class="hidden flex-col items-center justify-center text-center py-20 text-apple-subtext animate-pop-in">
+                <div class="w-16 h-16 rounded-3xl bg-gray-200/80 flex items-center justify-center mb-4 text-gray-400">
+                    <i class="ph-duotone ph-popcorn text-3xl"></i>
+                </div>
+                <p class="text-base font-semibold text-gray-700">No items found</p>
+                <p class="text-xs text-gray-500 mt-1 max-w-xs">Tap + to add new movies or series to this category or clear your search filter.</p>
+            </div>
+
+            <!-- List Container -->
+            <div class="space-y-2.5" id="watchlistContainer">
+                <!-- Watchlist Items injected dynamically -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Add / Edit Liquid Glass Modal Sheet -->
+    <div id="editModal" class="fixed inset-0 z-[100] hidden">
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-black/30 backdrop-blur-sm modal-overlay opacity-0 transition-opacity duration-300" id="editModalBackdrop" onclick="closeEditModal()"></div>
+        
+        <!-- Sheet Container -->
+        <div class="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-2xl rounded-t-3xl max-h-[90vh] overflow-y-auto transform translate-y-full modal-content transition-transform duration-300 ease-out sm:max-w-lg sm:mx-auto sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 sm:rounded-3xl sm:shadow-2xl border border-white/80" id="editModalContent">
+            
+            <div class="sticky top-0 bg-white/80 backdrop-blur-md z-20 px-5 py-4 border-b border-gray-200/70 flex justify-between items-center sm:rounded-t-3xl">
+                <button onclick="closeEditModal()" class="text-apple-blue hover:text-blue-700 text-sm font-medium transition-colors">Cancel</button>
+                <h2 class="font-bold text-base text-gray-900" id="modalTitle">Add Item</h2>
+                <button onclick="saveItem()" class="text-white bg-apple-blue px-4 py-1.5 rounded-full text-sm font-semibold shadow-sm hover:bg-apple-blueHover transition-all">Save</button>
+            </div>
+
+            <div class="p-5 space-y-5 pb-10">
+                <input type="hidden" id="itemId">
+                
+                <!-- Title Input -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 px-1">Title</label>
+                    <div class="liquid-glass-card rounded-2xl overflow-hidden border border-gray-200/80 focus-within:border-apple-blue focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
+                        <input type="text" id="itemTitle" placeholder="Title (e.g., Prison Break)" class="w-full px-4 py-3 bg-transparent outline-none text-gray-900 font-medium placeholder-gray-400">
+                    </div>
+                </div>
+
+                <!-- Custom Apple Liquid Glass Category Selector -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 px-1">Category</label>
+                    <div class="grid grid-cols-2 gap-1.5 p-1.5 bg-gray-200/60 rounded-2xl border border-white/60" id="categoryPillGroup">
+                        <button type="button" data-value="tv_series" onclick="selectCategoryPill('tv_series')" class="cat-pill py-2 px-3 rounded-xl text-xs font-semibold transition-all text-center">TV Series</button>
+                        <button type="button" data-value="movies" onclick="selectCategoryPill('movies')" class="cat-pill py-2 px-3 rounded-xl text-xs font-semibold transition-all text-center">Movies</button>
+                        <button type="button" data-value="sinhala_dramas" onclick="selectCategoryPill('sinhala_dramas')" class="cat-pill py-2 px-3 rounded-xl text-xs font-semibold transition-all text-center">Sinhala Dramas</button>
+                        <button type="button" data-value="sinhala_films" onclick="selectCategoryPill('sinhala_films')" class="cat-pill py-2 px-3 rounded-xl text-xs font-semibold transition-all text-center">Sinhala Films</button>
+                    </div>
+                    <input type="hidden" id="itemCategory" value="tv_series">
+                </div>
+
+                <!-- Custom Apple Liquid Glass Status Selector -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 px-1">Status</label>
+                    <div class="grid grid-cols-2 gap-1.5 p-1.5 bg-gray-200/60 rounded-2xl border border-white/60" id="statusPillGroup">
+                        <button type="button" data-value="plan_to_watch" onclick="selectStatusPill('plan_to_watch')" class="status-pill py-2 px-3 rounded-xl text-xs font-semibold transition-all text-center">Plan to Watch</button>
+                        <button type="button" data-value="watching" onclick="selectStatusPill('watching')" class="status-pill py-2 px-3 rounded-xl text-xs font-semibold transition-all text-center">Watching</button>
+                        <button type="button" data-value="completed" onclick="selectStatusPill('completed')" class="status-pill py-2 px-3 rounded-xl text-xs font-semibold transition-all text-center">Completed</button>
+                        <button type="button" data-value="dropped" onclick="selectStatusPill('dropped')" class="status-pill py-2 px-3 rounded-xl text-xs font-semibold transition-all text-center">Dropped</button>
+                    </div>
+                    <input type="hidden" id="itemStatus" value="plan_to_watch">
+                </div>
+
+                <!-- Season & Episode Progress Settings -->
+                <div class="liquid-glass-card rounded-2xl border border-gray-200/80 p-4 space-y-4">
+                    <!-- Season Progress -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <span class="text-xs font-bold text-gray-600 uppercase tracking-wider">Seasons (Optional)</span>
+                            <span class="text-xs text-gray-400">Current / Total</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="currentSeason" placeholder="Current S" class="w-1/2 p-2.5 bg-gray-100/80 border border-gray-200/60 rounded-xl text-center outline-none font-medium text-sm focus:bg-white focus:border-apple-blue transition-all" min="0">
+                            <span class="text-gray-300 font-light text-lg">/</span>
+                            <input type="number" id="totalSeasons" placeholder="Total S" class="w-1/2 p-2.5 bg-gray-100/80 border border-gray-200/60 rounded-xl text-center outline-none font-medium text-sm focus:bg-white focus:border-apple-blue transition-all" min="0">
+                        </div>
+                    </div>
+
+                    <div class="border-t border-gray-200/60 pt-3">
+                        <div class="flex justify-between items-center mb-1.5">
+                            <span class="text-xs font-bold text-gray-600 uppercase tracking-wider">Episodes (Optional)</span>
+                            <span class="text-xs text-gray-400">Watched / Total</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="episodesWatched" placeholder="Watched Ep" class="w-1/2 p-2.5 bg-gray-100/80 border border-gray-200/60 rounded-xl text-center outline-none font-medium text-sm focus:bg-white focus:border-apple-blue transition-all" min="0">
+                            <span class="text-gray-300 font-light text-lg">/</span>
+                            <input type="number" id="episodesTotal" placeholder="Total Ep" class="w-1/2 p-2.5 bg-gray-100/80 border border-gray-200/60 rounded-xl text-center outline-none font-medium text-sm focus:bg-white focus:border-apple-blue transition-all" min="0">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Watch Link / Playlist URL Input -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 px-1">Watch / Playlist Link (Optional)</label>
+                    <div class="liquid-glass-card rounded-2xl overflow-hidden border border-gray-200/80 flex items-center px-3 focus-within:border-apple-blue focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
+                        <i class="ph-bold ph-link text-gray-400 text-base mr-2"></i>
+                        <input type="url" id="watchUrl" placeholder="https://youtube.com/playlist... or streaming link" class="w-full py-3 bg-transparent outline-none text-gray-900 text-sm placeholder-gray-400">
+                    </div>
+                    <p class="text-[11px] text-gray-400 mt-1 px-1">Allows 1-click playback directly from your list!</p>
+                </div>
+
+                <!-- Rating Setting -->
+                <div id="ratingSection" class="liquid-glass-card rounded-2xl border border-gray-200/80 p-4 transition-all">
+                    <span class="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-2 text-center">Rating</span>
+                    <div class="flex justify-center gap-2 text-3xl" id="starContainer">
+                        <!-- Stars injected via JS -->
+                    </div>
+                    <input type="hidden" id="itemRating" value="0">
+                </div>
+
+                <!-- Delete Button -->
+                <div id="deleteBtnContainer" class="hidden">
+                    <button type="button" onclick="confirmDeleteItem()" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-3 rounded-2xl border border-red-200/60 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                        <i class="ph-bold ph-trash text-lg"></i> Delete Item
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Backup / Settings Liquid Glass Modal -->
+    <div id="backupModal" class="fixed inset-0 z-[100] hidden">
+        <div class="absolute inset-0 bg-black/30 backdrop-blur-sm modal-overlay opacity-0 transition-opacity duration-300" id="backupModalBackdrop" onclick="closeBackupModal()"></div>
+        
+        <div class="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-2xl rounded-t-3xl max-h-[90vh] overflow-y-auto transform translate-y-full modal-content transition-transform duration-300 ease-out sm:max-w-md sm:mx-auto sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 sm:rounded-3xl border border-white/80" id="backupModalContent">
+            
+            <div class="sticky top-0 bg-white/80 backdrop-blur-md z-20 px-5 py-4 border-b border-gray-200/70 flex justify-between items-center sm:rounded-t-3xl">
+                <div class="w-12"></div>
+                <h2 class="font-bold text-base text-gray-900 text-center">Settings & Backup</h2>
+                <button onclick="closeBackupModal()" class="text-apple-blue hover:text-blue-700 text-sm font-semibold">Done</button>
+            </div>
+
+            <div class="p-5 space-y-4 pb-10">
+                <div class="liquid-glass-card rounded-2xl border border-gray-200/80 overflow-hidden divide-y divide-gray-200/60">
+                    <button onclick="exportData()" class="w-full flex items-center justify-between p-4 hover:bg-white/60 active:bg-gray-100/80 transition-all text-left">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-blue-500/10 text-apple-blue flex items-center justify-center">
+                                <i class="ph-bold ph-export text-xl"></i>
+                            </div>
+                            <div>
+                                <span class="font-semibold text-sm text-gray-900 block">Export Backup</span>
+                                <span class="text-xs text-gray-500">Save list as JSON file</span>
+                            </div>
+                        </div>
+                        <i class="ph-bold ph-caret-right text-gray-400"></i>
+                    </button>
+                    
+                    <label class="w-full flex items-center justify-between p-4 hover:bg-white/60 active:bg-gray-100/80 transition-all text-left cursor-pointer">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-green-500/10 text-green-600 flex items-center justify-center">
+                                <i class="ph-bold ph-import text-xl"></i>
+                            </div>
+                            <div>
+                                <span class="font-semibold text-sm text-gray-900 block">Import Backup</span>
+                                <span class="text-xs text-gray-500">Restore from JSON backup</span>
+                            </div>
+                        </div>
+                        <i class="ph-bold ph-caret-right text-gray-400"></i>
+                        <input type="file" id="importFile" accept=".json" class="hidden" onchange="importData(event)">
+                    </label>
+                </div>
+
+                <div class="liquid-glass-card rounded-2xl border border-gray-200/80 overflow-hidden">
+                    <button onclick="confirmResetDatabase()" class="w-full flex items-center justify-between p-4 hover:bg-red-50/60 active:bg-red-100/80 transition-all text-left text-red-600">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-red-500/10 text-red-600 flex items-center justify-center">
+                                <i class="ph-bold ph-arrows-counter-clockwise text-xl"></i>
+                            </div>
+                            <div>
+                                <span class="font-semibold text-sm block">Reset to Default List</span>
+                                <span class="text-xs text-red-400">Reload initial movies & series</span>
+                            </div>
+                        </div>
+                        <i class="ph-bold ph-caret-right text-red-300"></i>
+                    </button>
+                </div>
+
+                <p class="text-xs text-center text-gray-400 px-4 leading-relaxed">
+                    Data is stored locally on this device via IndexedDB. Use Export to transfer your watch list across devices smoothly.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom iOS Style Confirm Dialog -->
+    <div id="confirmDialog" class="fixed inset-0 z-[120] hidden flex items-center justify-center px-4">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-xs" onclick="closeConfirmDialog(false)"></div>
+        <div class="relative bg-white/90 backdrop-blur-2xl rounded-3xl p-5 max-w-xs w-full text-center shadow-2xl border border-white/80 animate-pop-in z-10">
+            <h3 class="font-bold text-gray-900 text-base" id="confirmTitle">Are you sure?</h3>
+            <p class="text-xs text-gray-500 mt-1.5 mb-5" id="confirmMessage">This action cannot be undone.</p>
+            <div class="flex gap-2">
+                <button onclick="closeConfirmDialog(false)" class="flex-1 py-2.5 rounded-xl bg-gray-200/80 hover:bg-gray-300/80 font-semibold text-xs text-gray-700 transition-all">Cancel</button>
+                <button id="confirmActionBtn" class="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 font-semibold text-xs text-white transition-all shadow-md shadow-red-500/20">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Overlay -->
+    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[130] bg-gray-900/90 text-white backdrop-blur-md px-4 py-2.5 rounded-full text-xs font-medium shadow-xl opacity-0 pointer-events-none transition-all duration-300 flex items-center gap-2">
+        <i id="toastIcon" class="ph-bold ph-check-circle text-green-400 text-sm"></i>
+        <span id="toastMsg">Updated successfully</span>
+    </div>
+
+    <script>
+        const db = new Dexie('WatchlistProDB');
+        db.version(1).stores({
+            items: 'id, title, category, status, priority'
+        });
+        db.version(2).stores({
+            items: 'id, title, category, status, priority, watchUrl, currentSeason, totalSeasons'
+        });
+
+        // Constants
+        const CATEGORIES = [
+            { id: 'tv_series', label: 'TV Series' },
+            { id: 'movies', label: 'Movies' },
+            { id: 'sinhala_dramas', label: 'Sinhala Dramas' },
+            { id: 'sinhala_films', label: 'Sinhala Films' }
+        ];
+
+        const STATUS_COLORS = {
+            plan_to_watch: 'bg-gray-200/80 text-gray-700 border-gray-300/50',
+            watching: 'bg-blue-100/80 text-blue-700 border-blue-200/60',
+            completed: 'bg-emerald-100/80 text-emerald-700 border-emerald-200/60',
+            dropped: 'bg-rose-100/80 text-rose-700 border-rose-200/60'
+        };
+
+        const STATUS_LABELS = {
+            plan_to_watch: 'Plan to Watch',
+            watching: 'Watching',
+            completed: 'Completed',
+            dropped: 'Dropped'
+        };
+
+        let currentCategory = 'tv_series';
+        let currentStatusFilter = 'all';
+        let searchQuery = '';
+        let sortableInstance = null;
+        let pendingConfirmCallback = null;
+
+        // Utility: UUID
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        // Initial Data Seed
+        const INITIAL_DATA = [
+            // TV Series
+            ...['Reacher', 'Breaking Bad', 'Prison Break', 'Chernobyl', 'Game of thrones', 'Stranger Things', 'Dark', 'Black Mirror', 'Mr Robot']
+            .map((t, i) => ({ id: generateUUID(), title: t, category: 'tv_series', status: 'plan_to_watch', priority: i, currentSeason: '', totalSeasons: '', episodesWatched: '', episodesTotal: '', rating: 0, watchUrl: '' })),
+            
+            // Movies
+            ...['2.0', 'PK', 'Vettaiyan', 'Toxic - not yet released']
+            .map((t, i) => ({ id: generateUUID(), title: t, category: 'movies', status: 'plan_to_watch', priority: i, currentSeason: '', totalSeasons: '', episodesWatched: '', episodesTotal: '', rating: 0, watchUrl: '' })),
+
+            // Sinhala Dramas
+            ...['Paara dige', 'Ahankara adare', 'Mal Bigun', 'Koombiyo', 'Alawanthi', 'Raaga - ITN', 'Aluth sir', 'Husmak Lagin', 'Naadagamkarayo', 'Bolt Anayak', 'LBW - ITN', 'Thaappen Panna', 'Hithaagannama Bari Kathawak', 'Delft - Derana', 'Natath Ayek Sura Mathin', 'Patti Gedara', 'Jahuta', 'Sihineka Thaniwela', 'Rocky - Sirasa', 'Bodin Gedara - Derana', 'Kolamba Kattiya', 'Neela Samanalee', 'Sith Athara Histhan - Swarnawahini', 'Knock Out - Jathika Rupawahini', 'Amuthu Kalliya', 'Meesha', 'Siri - Hiru', 'Ron Soya']
+            .map((t, i) => ({ 
+                id: generateUUID(), 
+                title: t, 
+                category: 'sinhala_dramas', 
+                status: t.includes('Koombiyo') ? 'completed' : 'plan_to_watch', 
+                priority: i,
+                currentSeason: '', totalSeasons: '',
+                episodesWatched: '', episodesTotal: '', rating: t.includes('Koombiyo') ? 5 : 0,
+                watchUrl: ''
+            })),
+
+            // Sinhala Films
+            ...['Garasara', 'Sri Siddha', 'Gharasarapa']
+            .map((t, i) => ({ id: generateUUID(), title: t, category: 'sinhala_films', status: 'plan_to_watch', priority: i, currentSeason: '', totalSeasons: '', episodesWatched: '', episodesTotal: '', rating: 0, watchUrl: '' }))
+        ];
+
+        async function initApp() {
+            try {
+                const count = await db.items.count();
+                if (count === 0) {
+                    await db.items.bulkAdd(INITIAL_DATA);
+                }
+            } catch (err) {
+                console.error("Database seed error:", err);
+            }
+            
+            renderCategoryTabs();
+            loadCategory(currentCategory);
+            initRatingStars();
+        }
+
+        function renderCategoryTabs() {
+            const container = document.getElementById('categoryTabs');
+            container.innerHTML = CATEGORIES.map(cat => `
+                <button 
+                    onclick="switchCategory('${cat.id}')"
+                    class="flex-1 min-w-[100px] py-2 px-3 text-xs font-semibold rounded-xl transition-all duration-200 text-center whitespace-nowrap ${currentCategory === cat.id ? 'liquid-pill-active text-gray-900' : 'text-gray-500 hover:text-gray-800'}"
+                >
+                    ${cat.label}
+                </button>
+            `).join('');
+        }
+
+        function switchCategory(catId) {
+            currentCategory = catId;
+            renderCategoryTabs();
+            loadCategory(catId);
+        }
+
+        function handleSearch(val) {
+            searchQuery = val.trim().toLowerCase();
+            const clearBtn = document.getElementById('clearSearchBtn');
+            if (searchQuery) {
+                clearBtn.classList.remove('hidden');
+            } else {
+                clearBtn.classList.add('hidden');
+            }
+            loadCategory(currentCategory);
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            handleSearch('');
+        }
+
+        function handleFilterChange(val) {
+            currentStatusFilter = val;
+            loadCategory(currentCategory);
+        }
+
+        async function loadCategory(categoryId) {
+            let query = db.items.where('category').equals(categoryId);
+            let items = await query.sortBy('priority');
+
+            // Apply Status Filter
+            if (currentStatusFilter !== 'all') {
+                items = items.filter(item => item.status === currentStatusFilter);
+            }
+
+            // Apply Search Query
+            if (searchQuery) {
+                items = items.filter(item => item.title.toLowerCase().includes(searchQuery));
+            }
+
+            const container = document.getElementById('watchlistContainer');
+            const emptyState = document.getElementById('emptyState');
+
+            if (items.length === 0) {
+                container.innerHTML = '';
+                container.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            container.classList.remove('hidden');
+
+            container.innerHTML = items.map(item => {
+                const hasSeason = item.currentSeason || item.totalSeasons;
+                const hasEpisode = item.episodesWatched || item.episodesTotal;
+                const seasonText = hasSeason ? `S${item.currentSeason || '1'}${item.totalSeasons ? '/' + item.totalSeasons : ''}` : '';
+                const episodeText = hasEpisode ? `Ep ${item.episodesWatched || '0'}${item.episodesTotal ? '/' + item.episodesTotal : ''}` : '';
+
+                return `
+                <div class="liquid-glass-card rounded-2xl p-3.5 flex items-center justify-between transition-all hover:shadow-md group active:scale-[0.99]" data-id="${item.id}">
+                    <!-- Left Clickable Item Details -->
+                    <div class="flex-1 min-w-0 mr-3 cursor-pointer" onclick='openEditModalById("${item.id}")'>
+                        <h3 class="text-sm font-semibold text-gray-900 truncate tracking-tight">${escapeHtml(item.title)}</h3>
+                        
+                        <div class="flex flex-wrap items-center gap-2 mt-1.5">
+                            <!-- Status Pill -->
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_COLORS[item.status]}">
+                                ${STATUS_LABELS[item.status]}
+                            </span>
+
+                            <!-- Seasons / Episodes Badge -->
+                            ${(hasSeason || hasEpisode) ? `
+                                <span class="text-[11px] font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                    <i class="ph-bold ph-monitor-play text-gray-400"></i>
+                                    ${seasonText ? `<span>${seasonText}</span>` : ''}
+                                    ${seasonText && episodeText ? `<span>•</span>` : ''}
+                                    ${episodeText ? `<span>${episodeText}</span>` : ''}
+                                </span>
+                            ` : ''}
+
+                            <!-- Rating Badge -->
+                            ${item.status === 'completed' && item.rating > 0 ? `
+                                <span class="text-[11px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60 flex items-center gap-1">
+                                    <i class="ph-fill ph-star text-amber-400"></i> ${item.rating}
+                                </span>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Right Actions -->
+                    <div class="flex items-center gap-1.5" onclick="event.stopPropagation()">
+                        <!-- Watch / Playlist Link Button -->
+                        ${item.watchUrl ? `
+                            <a href="${escapeHtml(item.watchUrl)}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-apple-blue font-semibold text-xs flex items-center gap-1 transition-all" title="Open Watch Link">
+                                <i class="ph-fill ph-play-circle text-base"></i>
+                                <span class="hidden sm:inline">Watch</span>
+                            </a>
+                        ` : ''}
+
+                        <!-- Quick Increment Episode Button -->
+                        ${item.status === 'watching' ? `
+                            <button onclick="incrementEpisode('${item.id}')" class="w-8 h-8 rounded-xl bg-blue-50 hover:bg-blue-100 text-apple-blue flex items-center justify-center active:scale-90 transition-all" title="+1 Episode">
+                                <i class="ph-bold ph-plus text-sm"></i>
+                            </button>
+                        ` : ''}
+
+                        <!-- Drag Grip Handle -->
+                        <div class="drag-handle p-2 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing transition-colors">
+                            <i class="ph-bold ph-dots-six-vertical text-lg"></i>
+                        </div>
+                    </div>
+                </div>
+            `;
+            }).join('');
+
+            // Initialize or Reinitialize Sortable
+            if (sortableInstance) sortableInstance.destroy();
+            sortableInstance = new Sortable(container, {
+                handle: '.drag-handle',
+                animation: 200,
+                ghostClass: 'sortable-ghost',
+                dragClass: 'sortable-drag',
+                onEnd: handleSortEnd
+            });
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>"']/g, function(m) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+            });
+        }
+
+        async function handleSortEnd() {
+            const container = document.getElementById('watchlistContainer');
+            const rowIds = Array.from(container.children).map(row => row.getAttribute('data-id'));
+            
+            await db.transaction('rw', db.items, async () => {
+                for (let i = 0; i < rowIds.length; i++) {
+                    await db.items.update(rowIds[i], { priority: i });
+                }
+            });
+        }
+
+        async function incrementEpisode(id) {
+            const item = await db.items.get(id);
+            if (item) {
+                let watched = parseInt(item.episodesWatched) || 0;
+                let total = parseInt(item.episodesTotal) || 0;
+                
+                watched += 1;
+                if (total > 0 && watched >= total) {
+                    watched = total;
+                    item.status = 'completed';
+                    showToast(`Marked "${item.title}" as Completed! 🎉`);
+                } else {
+                    showToast(`Episode ${watched} logged`);
+                }
+                
+                item.episodesWatched = watched;
+                await db.items.put(item);
+                loadCategory(currentCategory);
+            }
+        }
+
+        function selectCategoryPill(val) {
+            document.getElementById('itemCategory').value = val;
+            const buttons = document.querySelectorAll('#categoryPillGroup .cat-pill');
+            buttons.forEach(btn => {
+                if (btn.getAttribute('data-value') === val) {
+                    btn.className = "cat-pill py-2 px-3 rounded-xl text-xs font-bold transition-all text-center liquid-pill-active text-apple-blue";
+                } else {
+                    btn.className = "cat-pill py-2 px-3 rounded-xl text-xs font-semibold transition-all text-center text-gray-600 hover:text-gray-900";
+                }
+            });
+        }
+
+        function selectStatusPill(val) {
+            document.getElementById('itemStatus').value = val;
+            const buttons = document.querySelectorAll('#statusPillGroup .status-pill');
+            buttons.forEach(btn => {
+                if (btn.getAttribute('data-value') === val) {
+                    btn.className = "status-pill py-2 px-3 rounded-xl text-xs font-bold transition-all text-center liquid-pill-active text-apple-blue";
+                } else {
+                    btn.className = "status-pill py-2 px-3 rounded-xl text-xs font-semibold transition-all text-center text-gray-600 hover:text-gray-900";
+                }
+            });
+            toggleRatingVisibility();
+        }
+
+        async function openEditModalById(id) {
+            const item = await db.items.get(id);
+            if (item) openEditModal(item);
+        }
+
+        function openEditModal(item = null) {
+            const modal = document.getElementById('editModal');
+            const backdrop = document.getElementById('editModalBackdrop');
+            const content = document.getElementById('editModalContent');
+            
+            if (item) {
+                document.getElementById('modalTitle').innerText = 'Edit Item';
+                document.getElementById('itemId').value = item.id;
+                document.getElementById('itemTitle').value = item.title;
+                selectCategoryPill(item.category || currentCategory);
+                selectStatusPill(item.status || 'plan_to_watch');
+                document.getElementById('currentSeason').value = item.currentSeason || '';
+                document.getElementById('totalSeasons').value = item.totalSeasons || '';
+                document.getElementById('episodesWatched').value = item.episodesWatched || '';
+                document.getElementById('episodesTotal').value = item.episodesTotal || '';
+                document.getElementById('watchUrl').value = item.watchUrl || '';
+                setRating(item.rating || 0);
+                document.getElementById('deleteBtnContainer').classList.remove('hidden');
+            } else {
+                document.getElementById('modalTitle').innerText = 'Add New Item';
+                document.getElementById('itemId').value = '';
+                document.getElementById('itemTitle').value = '';
+                selectCategoryPill(currentCategory);
+                selectStatusPill('plan_to_watch');
+                document.getElementById('currentSeason').value = '';
+                document.getElementById('totalSeasons').value = '';
+                document.getElementById('episodesWatched').value = '';
+                document.getElementById('episodesTotal').value = '';
+                document.getElementById('watchUrl').value = '';
+                setRating(0);
+                document.getElementById('deleteBtnContainer').classList.add('hidden');
+            }
+            
+            toggleRatingVisibility();
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                backdrop.classList.remove('opacity-0');
+                content.classList.remove('translate-y-full');
+            }, 10);
+        }
+
+        function closeEditModal() {
+            const modal = document.getElementById('editModal');
+            const backdrop = document.getElementById('editModalBackdrop');
+            const content = document.getElementById('editModalContent');
+            
+            backdrop.classList.add('opacity-0');
+            content.classList.add('translate-y-full');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 280);
+        }
+
+        function toggleRatingVisibility() {
+            const status = document.getElementById('itemStatus').value;
+            const ratingSec = document.getElementById('ratingSection');
+            if (status === 'completed') {
+                ratingSec.classList.remove('hidden');
+            } else {
+                ratingSec.classList.add('hidden');
+            }
+        }
+
+        function initRatingStars() {
+            const container = document.getElementById('starContainer');
+            container.innerHTML = Array.from({length: 5}, (_, i) => `
+                <i class="ph ph-star text-gray-300 cursor-pointer transition-all hover:scale-110 active:scale-95" data-val="${i+1}" onclick="setRating(${i+1})"></i>
+            `).join('');
+        }
+
+        function setRating(val) {
+            document.getElementById('itemRating').value = val;
+            const stars = document.getElementById('starContainer').children;
+            for (let i = 0; i < stars.length; i++) {
+                if (i < val) {
+                    stars[i].className = 'ph-fill ph-star text-amber-400 cursor-pointer transition-all hover:scale-110';
+                } else {
+                    stars[i].className = 'ph ph-star text-gray-300 cursor-pointer transition-all hover:scale-110';
+                }
+            }
+        }
+
+        async function saveItem() {
+            const id = document.getElementById('itemId').value || generateUUID();
+            const title = document.getElementById('itemTitle').value.trim();
+            const category = document.getElementById('itemCategory').value;
+            const status = document.getElementById('itemStatus').value;
+            const currentSeason = document.getElementById('currentSeason').value;
+            const totalSeasons = document.getElementById('totalSeasons').value;
+            const episodesWatched = document.getElementById('episodesWatched').value;
+            const episodesTotal = document.getElementById('episodesTotal').value;
+            const watchUrl = document.getElementById('watchUrl').value.trim();
+            const rating = parseInt(document.getElementById('itemRating').value) || 0;
+
+            if (!title) {
+                showToast("Please enter a title", "error");
+                return;
+            }
+
+            let priority = 0;
+            if (!document.getElementById('itemId').value) {
+                const maxItem = await db.items.where('category').equals(category).reverse().sortBy('priority');
+                if (maxItem.length > 0) priority = maxItem[0].priority + 1;
+            } else {
+                const existing = await db.items.get(id);
+                if(existing) priority = existing.priority;
+            }
+
+            const itemData = {
+                id, title, category, status, currentSeason, totalSeasons, episodesWatched, episodesTotal, watchUrl, rating, priority
+            };
+
+            await db.items.put(itemData);
+            closeEditModal();
+            showToast("Saved successfully");
+            loadCategory(category);
+        }
+
+        function confirmDeleteItem() {
+            const id = document.getElementById('itemId').value;
+            if (!id) return;
+
+            showConfirmDialog(
+                "Delete Item",
+                "Are you sure you want to remove this from your watchlist?",
+                async () => {
+                    await db.items.delete(id);
+                    closeEditModal();
+                    showToast("Item deleted");
+                    loadCategory(currentCategory);
+                }
+            );
+        }
+
+        function openBackupModal() {
+            const modal = document.getElementById('backupModal');
+            const backdrop = document.getElementById('backupModalBackdrop');
+            const content = document.getElementById('backupModalContent');
+            
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                backdrop.classList.remove('opacity-0');
+                content.classList.remove('translate-y-full');
+            }, 10);
+        }
+
+        function closeBackupModal() {
+            const modal = document.getElementById('backupModal');
+            const backdrop = document.getElementById('backupModalBackdrop');
+            const content = document.getElementById('backupModalContent');
+            
+            backdrop.classList.add('opacity-0');
+            content.classList.add('translate-y-full');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 280);
+        }
+
+        async function exportData() {
+            const allItems = await db.items.toArray();
+            const dataStr = JSON.stringify(allItems, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Watchlist_Backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            closeBackupModal();
+            showToast("Backup downloaded!");
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (Array.isArray(data)) {
+                        showConfirmDialog(
+                            "Import Backup",
+                            "This will replace your current watchlist. Proceed?",
+                            async () => {
+                                await db.items.clear();
+                                await db.items.bulkAdd(data);
+                                closeBackupModal();
+                                showToast("Backup imported!");
+                                loadCategory(currentCategory);
+                            }
+                        );
+                    } else {
+                        showToast("Invalid backup file format", "error");
+                    }
+                } catch (err) {
+                    showToast("Import failed: " + err.message, "error");
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function confirmResetDatabase() {
+            showConfirmDialog(
+                "Reset Database",
+                "Reset all watchlist items to default?",
+                async () => {
+                    await db.items.clear();
+                    await db.items.bulkAdd(INITIAL_DATA);
+                    closeBackupModal();
+                    showToast("Reset to default list!");
+                    loadCategory(currentCategory);
+                }
+            );
+        }
+
+        // Custom Confirm Dialog Handler
+        function showConfirmDialog(title, message, callback) {
+            document.getElementById('confirmTitle').innerText = title;
+            document.getElementById('confirmMessage').innerText = message;
+            pendingConfirmCallback = callback;
+            
+            const dialog = document.getElementById('confirmDialog');
+            dialog.classList.remove('hidden');
+        }
+
+        function closeConfirmDialog(isConfirmed) {
+            const dialog = document.getElementById('confirmDialog');
+            dialog.classList.add('hidden');
+            if (isConfirmed && pendingConfirmCallback) {
+                pendingConfirmCallback();
+            }
+            pendingConfirmCallback = null;
+        }
+
+        document.getElementById('confirmActionBtn').onclick = () => closeConfirmDialog(true);
+
+        // Toast Helper
+        function showToast(msg, type = "success") {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMsg.innerText = msg;
+            if (type === "error") {
+                toastIcon.className = "ph-bold ph-warning-circle text-red-400 text-sm";
+            } else {
+                toastIcon.className = "ph-bold ph-check-circle text-green-400 text-sm";
+            }
+
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            toast.classList.add('opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0', 'pointer-events-none');
+            }, 2500);
+        }
+
+        // Boot Application
+        window.onload = initApp;
+    </script>
+</body>
+</html>
